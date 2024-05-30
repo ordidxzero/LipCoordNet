@@ -6,6 +6,7 @@ from cvtransforms import *
 import torch
 import editdistance
 import json
+from hangul_toolkit import decompose_hangul, compose_hangul
 
 
 class MyDataset(Dataset):
@@ -108,6 +109,14 @@ class MyDataset(Dataset):
 
         return array
 
+    def _load_hangul_anno(self, name):
+        with open(name, "r") as f:
+            # start_time end_time text <- text에 공백이 존재하는 경우도 있기 때문에 split(" ", 2)로 설정
+            lines = [line.strip().split(" ", 2) for line in f.readlines()]
+            txt = [line[2] for line in lines]
+            txt = list(filter(lambda s: not s.upper() in ["SIL", "SP"], txt))
+        return MyDataset.hangul2arr(" ".join(txt))
+
     def _load_anno(self, name):
         with open(name, "r") as f:
             lines = [line.strip().split(" ") for line in f.readlines()]
@@ -145,6 +154,16 @@ class MyDataset(Dataset):
         return np.stack(array, axis=0)
 
     @staticmethod
+    def hangul2arr(txt):
+        arr = []
+        for c in list(txt):
+            if c == " ":
+                arr.append([32, 32, 32])
+            else:
+                arr.append(decompose_hangul(c))
+        return np.array(arr)
+
+    @staticmethod
     def txt2arr(txt, start):
         arr = []
         for c in list(txt):
@@ -158,6 +177,18 @@ class MyDataset(Dataset):
             if n >= start:
                 txt.append(MyDataset.letters[n - start])
         return "".join(txt).strip()
+
+    # @staticmethod
+    # def ctx_arr2hangul(arr, start):
+    #     pre = -1
+    #     syllables = []
+    #     isComposing = False
+    #     txt = []
+    #     for n in arr:
+    #         if pre != n and n >= start:
+    #             txt.append(MyDataset.letters[n - start])
+    #         pre = n
+    #     return "".join(txt).strip()
 
     @staticmethod
     def ctc_arr2txt(arr, start):
