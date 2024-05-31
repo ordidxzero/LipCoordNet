@@ -10,6 +10,72 @@ from hangul_toolkit import decompose_hangul, compose_hangul
 
 
 class MyDataset(Dataset):
+    hanguls = [
+        " ",
+        "ㄱ",  # 초성 시작 (i=1)
+        "ㄲ",
+        "ㄴ",
+        "ㄷ",
+        "ㄸ",
+        "ㄹ",
+        "ㅁ",
+        "ㅂ",
+        "ㅃ",
+        "ㅅ",
+        "ㅆ",
+        "ㅇ",
+        "ㅈ",
+        "ㅉ",
+        "ㅊ",
+        "ㅋ",
+        "ㅌ",
+        "ㅍ",
+        "ㅎ",  # 초성 끝 (i=19)
+        "ㅏ",  # 중성 시작 (i=20)
+        "ㅐ",
+        "ㅑ",
+        "ㅒ",
+        "ㅓ",
+        "ㅔ",
+        "ㅕ",
+        "ㅖ",
+        "ㅗ",
+        "ㅘ",
+        "ㅙ",
+        "ㅚ",
+        "ㅛ",
+        "ㅜ",
+        "ㅝ",
+        "ㅞ",
+        "ㅟ",
+        "ㅠ",
+        "ㅡ",
+        "ㅢ",
+        "ㅣ",  # 중성 끝 (i=40)
+        "ㄱ",  # 종성 시작 (i=41)
+        "ㄲ",
+        "ㄴ",
+        "ㄵ",
+        "ㄶ",
+        "ㄷ",
+        "ㄹ",
+        "ㄺ",
+        "ㄻ",
+        "ㄼ",
+        "ㅀ",
+        "ㅁ",
+        "ㅂ",
+        "ㅄ",
+        "ㅅ",
+        "ㅆ",
+        "ㅇ",
+        "ㅈ",
+        "ㅊ",
+        "ㅌ",
+        "ㅍ",
+        "ㅎ",
+        "",  # 종성 끝 (i=63)
+    ]
     letters = [
         " ",
         "A",
@@ -112,6 +178,7 @@ class MyDataset(Dataset):
     def _load_hangul_anno(self, name):
         with open(name, "r") as f:
             # start_time end_time text <- text에 공백이 존재하는 경우도 있기 때문에 split(" ", 2)로 설정
+            # ex. 1000 1000 안녕하세요 감사합니다 -> ["1000", "1000", "안녕하세요 감사합니다"]
             lines = [line.strip().split(" ", 2) for line in f.readlines()]
             txt = [line[2] for line in lines]
             txt = list(filter(lambda s: not s.upper() in ["SIL", "SP"], txt))
@@ -154,13 +221,16 @@ class MyDataset(Dataset):
         return np.stack(array, axis=0)
 
     @staticmethod
-    def hangul2arr(txt):
+    def hangul2arr(txt, start):
         arr = []
         for c in list(txt):
             if c == " ":
-                arr.append([32, 32, 32])
+                arr.append(1)
             else:
-                arr.append(decompose_hangul(c))
+                cho, jung, jong = decompose_hangul(c, return_unicode=False)
+                arr.append(MyDataset.hanguls.index(cho) + start)
+                arr.append(MyDataset.hanguls.index(jung, 20) + start)
+                arr.append(MyDataset.hanguls.index(jong, 20) + start)
         return np.array(arr)
 
     @staticmethod
@@ -169,6 +239,38 @@ class MyDataset(Dataset):
         for c in list(txt):
             arr.append(MyDataset.letters.index(c) + start)
         return np.array(arr)
+
+    @staticmethod
+    def arr2hangul(arr, start):
+        txt = []
+        syllables = []
+        order = 0
+        for n in arr:
+            if n >= start:
+                if n == 1:
+                    txt.append(" ")
+                    continue
+
+                if order == 0:
+                    # 초성
+                    syllables.append(MyDataset.hanguls[n - start])
+                    order += 1
+                    continue
+
+                if order == 1:
+                    # 중성
+                    syllables.append(MyDataset.hanguls[n - start])
+                    order += 1
+                    continue
+
+                if order == 2:
+                    # 종성
+                    syllables.append(MyDataset.hanguls[n - start])
+                    txt.append(compose_hangul(syllables, input_unicode=False))
+                    syllables = []
+                    order = 0
+                    continue
+        return "".join(txt).strip()
 
     @staticmethod
     def arr2txt(arr, start):
