@@ -4,3 +4,4 @@ samples
 output_videos
 
 *.mp4
+!sample*.mp4
